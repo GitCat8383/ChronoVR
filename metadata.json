@@ -1,0 +1,7 @@
+{
+  "name": "Historical Time Travel VR",
+  "description": "An immersive educational tool using Generative AI to reconstruct historical sites and simulate daily life through interactive exploration and NPC dialogue.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
