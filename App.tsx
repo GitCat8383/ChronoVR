@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Era, GameState, Message, NavigationAction, HistoricalEvent } from './types';
-import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, generateHistoricalVideo } from './services/geminiService';
+import { Era, GameState, Message, NavigationAction, HistoricalEvent, MapLocation } from './types';
+import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, generateHistoricalVideo, generateMapVisual } from './services/geminiService';
 import { SceneView } from './components/SceneView';
 import { ChatInterface } from './components/ChatInterface';
 import { Controls } from './components/Controls';
 import { LocationMenu } from './components/LocationMenu';
 import { GameHUD } from './components/GameHUD';
 import { HistoricalEvents } from './components/HistoricalEvents';
+import { MapInterface } from './components/MapInterface';
+import { SpatialViewer } from './components/SpatialViewer';
 import { History, Loader2, X } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
@@ -30,8 +32,11 @@ const INITIAL_STATE: GameState = {
   },
   showConfidenceLayer: false,
   historicalEvents: [],
+  mapLocations: [],
   isGeneratingVideo: false,
-  currentVideoEventId: null
+  currentVideoEventId: null,
+  viewingLocationId: null,
+  locationVisuals: {}
 };
 
 export default function App() {
@@ -42,22 +47,28 @@ export default function App() {
   const [isInitializing, setIsInitializing] = useState(false);
   // Separate state for playing video to show overlay
   const [activeVideoUri, setActiveVideoUri] = useState<string | null>(null);
+  // State for Spatial Viewer (3D Map View)
+  const [activeMapLocation, setActiveMapLocation] = useState<MapLocation | null>(null);
+  const [isLoadingSpatial, setIsLoadingSpatial] = useState(false);
 
   // Initialize Game Logic
   const initializeEra = async (selectedEra: Era) => {
     setIsInitializing(true);
     setMessages([]);
     setActiveVideoUri(null);
+    setActiveMapLocation(null);
+    setGameState(prev => ({ ...prev, locationVisuals: {} })); // Clear visual cache on era change
     
-    // 1. Start Simulation (Get Role/Stats)
-    const simState = await startSimulation(selectedEra);
+    // 1. Start Simulation (Get Role/Stats + Map Locations)
+    const { simState, mapLocations } = await startSimulation(selectedEra);
     
     // 2. Get Initial Scene based on Sim State
     setGameState(prev => ({ 
         ...prev, 
         isLoadingText: true,
         simulation: simState,
-        historicalEvents: [] // Reset events
+        mapLocations: mapLocations,
+        historicalEvents: [] 
     }));
 
     const navResult = await navigateScene(
@@ -127,21 +138,20 @@ export default function App() {
       simulation: { 
           ...prev.simulation, 
           ...navResult.simulationUpdate,
-          // Merge gold/health changes
           gold: prev.simulation.gold + navResult.simulationUpdate.goldChange,
           health: prev.simulation.health + navResult.simulationUpdate.healthChange,
       },
-      historicalEvents: navResult.historicalEvents || [], // Update events for new location
+      historicalEvents: navResult.historicalEvents || [], 
       isLoadingText: false
     }));
 
-    // System message if something major happened
+    // System message
     if (navResult.simulationUpdate.actionResultText) {
         setMessages(prev => [
             ...prev,
             {
                 id: Date.now().toString(),
-                sender: 'npc', // Using NPC style for system messages
+                sender: 'npc', 
                 text: `[SYSTEM] ${navResult.simulationUpdate.actionResultText}`,
                 timestamp: new Date()
             }
@@ -179,10 +189,11 @@ export default function App() {
         parts: [{ text: m.text }]
     }));
 
-    // Pass active video context if any
     const context = activeVideoUri 
-        ? "The user is currently watching a historical reconstruction video. Explain what is happening in the video." 
-        : "";
+        ? "The user is currently watching a historical reconstruction video." 
+        : activeMapLocation 
+            ? `The user is visualizing the 3D space of ${activeMapLocation.name}.`
+            : "";
 
     const response = await chatWithNPC(
       era,
@@ -205,21 +216,18 @@ export default function App() {
   };
 
   const handlePlayEvent = async (event: HistoricalEvent) => {
-    // 1. Check if video already exists
     if (event.videoUri) {
         setActiveVideoUri(event.videoUri);
-        triggerNPCExplanation(event);
+        triggerNPCExplanation(event.title, event.description);
         return;
     }
 
-    // 2. Generate video
     setGameState(prev => ({ 
         ...prev, 
-        isGeneratingVideo: true,
+        isGeneratingVideo: true, 
         currentVideoEventId: event.id 
     }));
 
-    // Add immediate feedback
     setMessages(prev => [
         ...prev,
         {
@@ -233,7 +241,6 @@ export default function App() {
     const videoUri = await generateHistoricalVideo(event.videoPrompt);
 
     setGameState(prev => {
-        // Update the event with the video URI so we don't regen it
         const updatedEvents = prev.historicalEvents.map(e => 
             e.id === event.id ? { ...e, videoUri: videoUri || undefined } : e
         );
@@ -247,30 +254,49 @@ export default function App() {
 
     if (videoUri) {
         setActiveVideoUri(videoUri);
-        triggerNPCExplanation(event);
+        triggerNPCExplanation(event.title, event.description);
     } else {
-        // Handle error
          setMessages(prev => [
             ...prev,
             {
                 id: Date.now().toString(),
                 sender: 'npc',
-                text: `*Frowns* "My memory is hazy... I cannot show you that vision clearly." (Video generation failed)`,
+                text: `*Frowns* "My memory is hazy... I cannot show you that vision clearly."`,
                 timestamp: new Date()
             }
         ]);
     }
   };
 
-  const triggerNPCExplanation = (event: HistoricalEvent) => {
-     // Simulate NPC starting the conversation about the video
+  const handleSelectMapLocation = async (location: MapLocation) => {
+      setActiveMapLocation(location);
+      
+      // Check cache first
+      if (gameState.locationVisuals[location.id]) {
+          return;
+      }
+
+      setIsLoadingSpatial(true);
+      const visualUrl = await generateMapVisual(era, location.visualPrompt);
+      
+      setGameState(prev => ({
+          ...prev,
+          locationVisuals: {
+              ...prev.locationVisuals,
+              [location.id]: visualUrl || ''
+          }
+      }));
+      setIsLoadingSpatial(false);
+  };
+
+  const triggerNPCExplanation = (title: string, desc: string) => {
      setTimeout(() => {
          setMessages(prev => [
             ...prev,
             {
                 id: Date.now().toString(),
                 sender: 'npc',
-                text: `*Gestures to the vision of ${event.title}* "Behold. ${event.description} This moment changed everything..."`,
+                text: `*Gestures to the vision of ${title}* "Behold. ${desc} This moment changed everything..."`,
                 timestamp: new Date()
             }
         ]);
@@ -313,9 +339,17 @@ export default function App() {
         {/* Game Stats HUD */}
         <GameHUD state={gameState.simulation} />
 
+        {/* Spatial Map Viewer (3D Modal) */}
+        <SpatialViewer 
+            location={activeMapLocation}
+            imageUrl={activeMapLocation ? gameState.locationVisuals[activeMapLocation.id] : null}
+            isLoading={isLoadingSpatial}
+            onClose={() => setActiveMapLocation(null)}
+        />
+
         {/* Video Overlay Modal */}
         {activeVideoUri && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in">
                 <div className="relative w-full max-w-4xl bg-black rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
                     <button 
                         onClick={() => setActiveVideoUri(null)}
@@ -336,6 +370,16 @@ export default function App() {
                 </div>
             </div>
         )}
+
+        {/* Map Interface - Placed below navigation/HUD per request */}
+        <section>
+             <MapInterface 
+                locations={gameState.mapLocations}
+                onSelectLocation={handleSelectMapLocation}
+                disabled={isInitializing}
+                era={era}
+            />
+        </section>
 
         {/* Main Visual Viewport */}
         <section>

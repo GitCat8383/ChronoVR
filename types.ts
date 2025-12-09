@@ -47,6 +47,16 @@ export interface HistoricalEvent {
   videoUri?: string;
 }
 
+export interface MapLocation {
+  id: string;
+  name: string;
+  x: number; // 0-100 percentage for map positioning
+  y: number; // 0-100 percentage
+  type: 'strategic' | 'cultural' | 'conflict';
+  description: string;
+  visualPrompt: string; // Prompt to generate the 3D/Panoramic view
+}
+
 export interface GameState {
   currentLocation: string;
   currentDescription: string;
@@ -60,8 +70,11 @@ export interface GameState {
   simulation: SimulationState;
   showConfidenceLayer: boolean;
   historicalEvents: HistoricalEvent[];
+  mapLocations: MapLocation[];
   isGeneratingVideo: boolean;
   currentVideoEventId: string | null;
+  viewingLocationId: string | null;
+  locationVisuals: Record<string, string>; // Cache for map visual URLs
 }
 
 export interface NavigationAction {

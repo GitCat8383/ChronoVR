@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Era, SimulationState, HistoricalEvent } from '../types';
+import { Era, SimulationState, HistoricalEvent, MapLocation } from '../types';
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -27,8 +27,8 @@ const getJson = async (prompt: string, systemInstruction: string, schema: Schema
   }
 };
 
-// 1. Initialize "Day in the Life"
-export const startSimulation = async (era: Era): Promise<SimulationState> => {
+// 1. Initialize "Day in the Life" + Map
+export const startSimulation = async (era: Era): Promise<{ simState: SimulationState, mapLocations: MapLocation[] }> => {
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
@@ -37,26 +37,70 @@ export const startSimulation = async (era: Era): Promise<SimulationState> => {
       inventory: { type: Type.ARRAY, items: { type: Type.STRING } },
       gold: { type: Type.NUMBER },
       health: { type: Type.NUMBER },
-      timeOfDay: { type: Type.STRING }
+      timeOfDay: { type: Type.STRING },
+      mapLocations: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            x: { type: Type.NUMBER, description: "X coordinate percentage (10-90)" },
+            y: { type: Type.NUMBER, description: "Y coordinate percentage (10-90)" },
+            type: { type: Type.STRING, enum: ['strategic', 'cultural', 'conflict'] },
+            description: { type: Type.STRING },
+            visualPrompt: { type: Type.STRING, description: "Prompt for a 360-degree panoramic view of this location during a key historical moment." }
+          },
+          required: ["name", "x", "y", "type", "description", "visualPrompt"]
+        }
+      }
     },
-    required: ["role", "objective", "inventory", "gold", "health", "timeOfDay"]
+    required: ["role", "objective", "inventory", "gold", "health", "timeOfDay", "mapLocations"]
   };
 
-  const system = `Assign the user a humble but interesting role in ${era}. Give them a daily survival objective.`;
-  const prompt = `Generate a starting state for a historical simulation.`;
+  const system = `
+    Initialize a historical simulation in ${era}. 
+    1. Assign the user a humble role.
+    2. Generate 4-5 KEY locations for a city map. 
+       - If Vietnam War: Must include 'Hue Citadel' (Tet Offensive context) and 'Independence Palace' (Fall of Saigon context) if relevant to the specific year provided in Era.
+       - Locations should allow for "Street View" style visualization of historical events.
+  `;
+  const prompt = `Generate starting state and map for ${era}.`;
 
   try {
     const data = await getJson(prompt, system, schema);
-    return { ...data, isActive: true };
+    
+    // Add IDs to map locations
+    const mapLocations = data.mapLocations.map((loc: any, i: number) => ({
+      ...loc,
+      id: `loc-${Date.now()}-${i}`
+    }));
+
+    return { 
+      simState: { 
+        isActive: true,
+        role: data.role,
+        objective: data.objective,
+        timeOfDay: data.timeOfDay,
+        gold: data.gold,
+        health: data.health,
+        inventory: data.inventory,
+        lastActionResult: undefined
+      },
+      mapLocations
+    };
   } catch (e) {
+    console.error("Start Sim Error", e);
     return {
-      isActive: true,
-      role: "Traveler",
-      objective: "Explore the city",
-      inventory: ["Bread", "Water"],
-      gold: 10,
-      health: 100,
-      timeOfDay: "Dawn"
+      simState: {
+        isActive: true,
+        role: "Traveler",
+        objective: "Explore",
+        inventory: [],
+        gold: 10,
+        health: 100,
+        timeOfDay: "Dawn"
+      },
+      mapLocations: []
     };
   }
 };
@@ -297,3 +341,36 @@ export const chatWithNPC = async (
     return "I cannot understand you.";
   }
 };
+
+// 6. Generate Map Visual (Panoramic)
+export const generateMapVisual = async (era: Era, prompt: string): Promise<string | null> => {
+    const model = "gemini-2.5-flash-image";
+    const fullPrompt = `
+      Wide angle panoramic shot, 16:9 aspect ratio.
+      Historical reconstruction of ${era}.
+      Location: ${prompt}.
+      Action: Historical event in progress or daily life.
+      Style: Photorealistic, cinematic, immersive, high detail.
+      View: Wide establishing shot looking down a street or across a battlefield.
+    `;
+  
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: fullPrompt
+      });
+      
+      const parts = response.candidates?.[0]?.content?.parts;
+      if (parts) {
+        for (const part of parts) {
+          if (part.inlineData) {
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          }
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Map Visual Gen Error:", error);
+      return null;
+    }
+  };
