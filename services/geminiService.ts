@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Era, SimulationState, HistoricalEvent, MapLocation } from '../types';
+import { Era, SimulationState, HistoricalEvent, MapLocation, Perspective } from '../types';
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -27,8 +27,8 @@ const getJson = async (prompt: string, systemInstruction: string, schema: Schema
   }
 };
 
-// 1. Initialize "Day in the Life" + Map
-export const startSimulation = async (era: Era): Promise<{ simState: SimulationState, mapLocations: MapLocation[] }> => {
+// 1. Initialize "Day in the Life" + Map + Perspectives
+export const startSimulation = async (era: Era): Promise<{ simState: SimulationState, mapLocations: MapLocation[], perspectives: Perspective[] }> => {
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
@@ -52,9 +52,22 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
           },
           required: ["name", "x", "y", "type", "description", "visualPrompt"]
         }
+      },
+      perspectives: {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING },
+                role: { type: Type.STRING },
+                type: { type: Type.STRING, enum: ['key_figure', 'commoner', 'expert'] },
+                content: { type: Type.STRING, description: "A 1-2 sentence quote representing their strong opinion on the current era." }
+            },
+            required: ["name", "role", "type", "content"]
+        }
       }
     },
-    required: ["role", "objective", "inventory", "gold", "health", "timeOfDay", "mapLocations"]
+    required: ["role", "objective", "inventory", "gold", "health", "timeOfDay", "mapLocations", "perspectives"]
   };
 
   const system = `
@@ -63,8 +76,12 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
     2. Generate 4-5 KEY locations for a city map. 
        - If Vietnam War: Must include 'Hue Citadel' (Tet Offensive context) and 'Independence Palace' (Fall of Saigon context) if relevant to the specific year provided in Era.
        - Locations should allow for "Street View" style visualization of historical events.
+    3. Generate 3-4 diverse perspectives on this era:
+       - 1 Key Historical Figure (e.g., Caesar, Ho Chi Minh).
+       - 1-2 Commoners (e.g., Soldier, Merchant, Peasant).
+       - 1 Modern Expert/Historian analyzing the period retrospectively.
   `;
-  const prompt = `Generate starting state and map for ${era}.`;
+  const prompt = `Generate starting state, map, and perspectives for ${era}.`;
 
   try {
     const data = await getJson(prompt, system, schema);
@@ -73,6 +90,12 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
     const mapLocations = data.mapLocations.map((loc: any, i: number) => ({
       ...loc,
       id: `loc-${Date.now()}-${i}`
+    }));
+
+    // Add IDs to perspectives
+    const perspectives = data.perspectives.map((p: any, i: number) => ({
+        ...p,
+        id: `persp-${Date.now()}-${i}`
     }));
 
     return { 
@@ -86,7 +109,8 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
         inventory: data.inventory,
         lastActionResult: undefined
       },
-      mapLocations
+      mapLocations,
+      perspectives
     };
   } catch (e) {
     console.error("Start Sim Error", e);
@@ -100,7 +124,8 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
         health: 100,
         timeOfDay: "Dawn"
       },
-      mapLocations: []
+      mapLocations: [],
+      perspectives: []
     };
   }
 };

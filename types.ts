@@ -57,6 +57,14 @@ export interface MapLocation {
   visualPrompt: string; // Prompt to generate the 3D/Panoramic view
 }
 
+export interface Perspective {
+  id: string;
+  name: string;
+  role: string;
+  type: 'key_figure' | 'commoner' | 'expert';
+  content: string; // Their quote/viewpoint
+}
+
 export interface GameState {
   currentLocation: string;
   currentDescription: string;
@@ -71,6 +79,7 @@ export interface GameState {
   showConfidenceLayer: boolean;
   historicalEvents: HistoricalEvent[];
   mapLocations: MapLocation[];
+  perspectives: Perspective[];
   isGeneratingVideo: boolean;
   currentVideoEventId: string | null;
   viewingLocationId: string | null;

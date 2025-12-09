@@ -9,6 +9,7 @@ import { GameHUD } from './components/GameHUD';
 import { HistoricalEvents } from './components/HistoricalEvents';
 import { MapInterface } from './components/MapInterface';
 import { SpatialViewer } from './components/SpatialViewer';
+import { Perspectives } from './components/Perspectives';
 import { History, Loader2, X } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
@@ -33,6 +34,7 @@ const INITIAL_STATE: GameState = {
   showConfidenceLayer: false,
   historicalEvents: [],
   mapLocations: [],
+  perspectives: [],
   isGeneratingVideo: false,
   currentVideoEventId: null,
   viewingLocationId: null,
@@ -59,8 +61,8 @@ export default function App() {
     setActiveMapLocation(null);
     setGameState(prev => ({ ...prev, locationVisuals: {} })); // Clear visual cache on era change
     
-    // 1. Start Simulation (Get Role/Stats + Map Locations)
-    const { simState, mapLocations } = await startSimulation(selectedEra);
+    // 1. Start Simulation (Get Role/Stats + Map Locations + Perspectives)
+    const { simState, mapLocations, perspectives } = await startSimulation(selectedEra);
     
     // 2. Get Initial Scene based on Sim State
     setGameState(prev => ({ 
@@ -68,6 +70,7 @@ export default function App() {
         isLoadingText: true,
         simulation: simState,
         mapLocations: mapLocations,
+        perspectives: perspectives,
         historicalEvents: [] 
     }));
 
@@ -423,14 +426,21 @@ export default function App() {
           </div>
 
           {/* Chat - Takes 2 columns */}
-          <div className="lg:col-span-2 h-full min-h-[500px]">
-            <ChatInterface 
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              npcName={gameState.npcName}
-              npcRole={gameState.npcRole}
-              isTyping={isTyping}
-            />
+          <div className="lg:col-span-2 flex flex-col gap-6 h-full">
+            <div className="flex-1 min-h-[400px]">
+                <ChatInterface 
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    npcName={gameState.npcName}
+                    npcRole={gameState.npcRole}
+                    isTyping={isTyping}
+                />
+            </div>
+            
+            {/* Perspectives Component placed below Chat */}
+            <div className="flex-shrink-0">
+                <Perspectives perspectives={gameState.perspectives} />
+            </div>
           </div>
 
         </section>
