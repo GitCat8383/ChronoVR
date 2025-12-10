@@ -1,5 +1,5 @@
-# Run and deploy
-https://ai.studio/apps/drive/1qS3rwT-pb7O9JXq_Do91RxrM0-7pQEN3
+# Try the app
+https://historical-time-travel-vr-22022805342.us-west1.run.app/
 
 ## Run Locally
 
