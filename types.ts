@@ -3,7 +3,6 @@ export enum Era {
   TENOCHTITLAN = 'Tenochtitlan (1500 AD)',
   VICTORIAN_LONDON = 'Victorian London (1880 AD)',
   ANCIENT_EGYPT = 'Ancient Egypt, Giza (2500 BC)',
-  VIETNAM_WAR = 'Vietnam War, Saigon (1968 AD)',
   NINE_ELEVEN = 'New York City (September 11, 2001)'
 }
 
