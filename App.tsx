@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Era, GameState, Message, NavigationAction, HistoricalEvent, MapLocation, LocalNPC } from './types';
-import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, chatWithExpert, generateHistoricalVideo, generateMapVisual } from './services/geminiService';
+import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, chatWithExpert, generateHistoricalVideo, generateMapVisual, generateStrategicMapImage } from './services/geminiService';
 import { SceneView } from './components/SceneView';
 import { ChatInterface } from './components/ChatInterface';
 import { Controls } from './components/Controls';
@@ -17,6 +17,7 @@ const INITIAL_STATE: GameState = {
   currentLocation: "City Gates",
   currentDescription: "Loading simulation...",
   imageUrl: null,
+  mapBackgroundUrl: null,
   isLoadingImage: false,
   isLoadingText: false,
   npcName: "...",
@@ -70,8 +71,13 @@ export default function App() {
     setChatMode('npc');
     setActiveVideoUri(null);
     setActiveMapLocation(null);
-    setGameState(prev => ({ ...prev, locationVisuals: {} })); 
+    setGameState(prev => ({ ...prev, locationVisuals: {}, mapBackgroundUrl: null })); 
     
+    // 0. Trigger Map Background Generation in background
+    generateStrategicMapImage(selectedEra).then(url => {
+        setGameState(prev => ({ ...prev, mapBackgroundUrl: url }));
+    });
+
     // 1. Start Simulation
     const { simState, mapLocations, perspectives } = await startSimulation(selectedEra);
     
@@ -466,6 +472,7 @@ export default function App() {
                 onSelectLocation={handleSelectMapLocation}
                 disabled={isInitializing}
                 era={era}
+                mapImageUrl={gameState.mapBackgroundUrl}
             />
         </section>
 

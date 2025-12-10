@@ -7,9 +7,10 @@ interface MapInterfaceProps {
   onSelectLocation: (location: MapLocation) => void;
   disabled: boolean;
   era: string;
+  mapImageUrl: string | null;
 }
 
-export const MapInterface: React.FC<MapInterfaceProps> = ({ locations, onSelectLocation, disabled, era }) => {
+export const MapInterface: React.FC<MapInterfaceProps> = ({ locations, onSelectLocation, disabled, era, mapImageUrl }) => {
   return (
     <div className="bg-gray-900/90 backdrop-blur-md rounded-xl border border-gray-800 p-1 shadow-xl mb-6 relative overflow-hidden group">
         {/* Map Header */}
@@ -19,15 +20,25 @@ export const MapInterface: React.FC<MapInterfaceProps> = ({ locations, onSelectL
             </h3>
         </div>
 
-        {/* Map Background (Abstract Grid) */}
-        <div className="w-full h-64 md:h-80 bg-[#1a1a20] relative opacity-90 overflow-hidden">
-             {/* Grid Lines */}
-             <div className="absolute inset-0" 
-                style={{ 
-                    backgroundImage: 'linear-gradient(#2a2a30 1px, transparent 1px), linear-gradient(90deg, #2a2a30 1px, transparent 1px)', 
-                    backgroundSize: '40px 40px' 
-                }} 
-             />
+        {/* Map Background */}
+        <div className="w-full h-64 md:h-80 bg-[#1a1a20] relative overflow-hidden">
+             
+             {/* Base Map Image */}
+             {mapImageUrl ? (
+                 <img 
+                    src={mapImageUrl} 
+                    alt="Strategic Map" 
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay sepia contrast-125"
+                 />
+             ) : (
+                 /* Abstract Grid Fallback */
+                 <div className="absolute inset-0 opacity-90" 
+                    style={{ 
+                        backgroundImage: 'linear-gradient(#2a2a30 1px, transparent 1px), linear-gradient(90deg, #2a2a30 1px, transparent 1px)', 
+                        backgroundSize: '40px 40px' 
+                    }} 
+                 />
+             )}
              
              {/* Radar/Scan Effect */}
              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-amber-900/5 to-transparent animate-scan pointer-events-none" />

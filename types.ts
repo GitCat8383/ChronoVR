@@ -78,6 +78,7 @@ export interface GameState {
   currentLocation: string;
   currentDescription: string;
   imageUrl: string | null;
+  mapBackgroundUrl: string | null; // URL for the generated strategic map
   isLoadingImage: boolean;
   isLoadingText: boolean;
   npcName: string; // Currently active chat NPC

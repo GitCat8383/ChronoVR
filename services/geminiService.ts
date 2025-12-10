@@ -447,3 +447,36 @@ export const generateMapVisual = async (era: Era, prompt: string): Promise<strin
       return null;
     }
   };
+
+// 8. Generate Strategic Map (Top-down)
+export const generateStrategicMapImage = async (era: Era): Promise<string | null> => {
+    const model = "gemini-2.5-flash-image";
+    const prompt = `
+      Top down historical map of ${era}. 
+      Old parchment paper texture, beige and brown tones.
+      Cartography style appropriate for the period.
+      Bird's eye view of the region or city.
+      High detail, no modern elements.
+      Weathered edges, ink aesthetics.
+    `;
+  
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt
+      });
+      
+      const parts = response.candidates?.[0]?.content?.parts;
+      if (parts) {
+        for (const part of parts) {
+          if (part.inlineData) {
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          }
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Strategic Map Gen Error:", error);
+      return null;
+    }
+  };
