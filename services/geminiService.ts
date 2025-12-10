@@ -367,7 +367,45 @@ export const chatWithNPC = async (
   }
 };
 
-// 6. Generate Map Visual (Panoramic)
+// 6. Expert Chat (Factual)
+export const chatWithExpert = async (
+  era: Era,
+  history: { role: string; parts: { text: string }[] }[],
+  userMessage: string
+): Promise<string> => {
+  const model = "gemini-2.5-flash";
+  
+  const systemInstruction = `
+    You are a world-renowned Historian and Archaeologist specializing in ${era}.
+    Your goal is to educate the user with factual precision.
+    
+    RULES:
+    1. Provide detailed, accurate historical context.
+    2. Cite archaeological evidence or primary sources where appropriate.
+    3. Distinguish clearly between proven fact, strong theory, and pop-culture myth.
+    4. You are NOT roleplaying a character from the past; you are a modern expert analyzing it.
+    5. Maintain a professional, academic, yet accessible tone.
+  `;
+
+  try {
+    const chat = ai.chats.create({
+      model,
+      config: {
+        systemInstruction,
+        temperature: 0.7
+      },
+      history: history
+    });
+
+    const result = await chat.sendMessage({ message: userMessage });
+    return result.text || "I apologize, but I cannot verify that information currently.";
+  } catch (error) {
+    console.error("Expert Chat Error:", error);
+    return "The archives are currently inaccessible.";
+  }
+};
+
+// 7. Generate Map Visual (Panoramic)
 export const generateMapVisual = async (era: Era, prompt: string): Promise<string | null> => {
     const model = "gemini-2.5-flash-image";
     const fullPrompt = `

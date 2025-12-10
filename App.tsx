@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Era, GameState, Message, NavigationAction, HistoricalEvent, MapLocation } from './types';
-import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, generateHistoricalVideo, generateMapVisual } from './services/geminiService';
+import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, chatWithExpert, generateHistoricalVideo, generateMapVisual } from './services/geminiService';
 import { SceneView } from './components/SceneView';
 import { ChatInterface } from './components/ChatInterface';
 import { Controls } from './components/Controls';
@@ -44,12 +44,18 @@ const INITIAL_STATE: GameState = {
 export default function App() {
   const [era, setEra] = useState<Era>(Era.ANCIENT_ROME);
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
+  
+  // NPC Chat State
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Expert Chat State
+  const [expertMessages, setExpertMessages] = useState<Message[]>([]);
+  const [isExpertTyping, setIsExpertTyping] = useState(false);
+  const [chatMode, setChatMode] = useState<'npc' | 'expert'>('npc');
+
   const [isInitializing, setIsInitializing] = useState(false);
-  // Separate state for playing video to show overlay
   const [activeVideoUri, setActiveVideoUri] = useState<string | null>(null);
-  // State for Spatial Viewer (3D Map View)
   const [activeMapLocation, setActiveMapLocation] = useState<MapLocation | null>(null);
   const [isLoadingSpatial, setIsLoadingSpatial] = useState(false);
 
@@ -57,14 +63,16 @@ export default function App() {
   const initializeEra = async (selectedEra: Era) => {
     setIsInitializing(true);
     setMessages([]);
+    setExpertMessages([]);
+    setChatMode('npc');
     setActiveVideoUri(null);
     setActiveMapLocation(null);
-    setGameState(prev => ({ ...prev, locationVisuals: {} })); // Clear visual cache on era change
+    setGameState(prev => ({ ...prev, locationVisuals: {} })); 
     
-    // 1. Start Simulation (Get Role/Stats + Map Locations + Perspectives)
+    // 1. Start Simulation
     const { simState, mapLocations, perspectives } = await startSimulation(selectedEra);
     
-    // 2. Get Initial Scene based on Sim State
+    // 2. Get Initial Scene
     setGameState(prev => ({ 
         ...prev, 
         isLoadingText: true,
@@ -148,7 +156,7 @@ export default function App() {
       isLoadingText: false
     }));
 
-    // System message
+    // System message to NPC chat
     if (navResult.simulationUpdate.actionResultText) {
         setMessages(prev => [
             ...prev,
@@ -178,6 +186,11 @@ export default function App() {
   };
 
   const handleSendMessage = async (text: string) => {
+    if (chatMode === 'expert') {
+        handleExpertMessage(text);
+        return;
+    }
+
     const userMsg: Message = {
       id: Date.now().toString(),
       sender: 'user',
@@ -216,6 +229,33 @@ export default function App() {
     };
     setMessages(prev => [...prev, npcMsg]);
     setIsTyping(false);
+  };
+
+  const handleExpertMessage = async (text: string) => {
+      const userMsg: Message = {
+          id: Date.now().toString(),
+          sender: 'user',
+          text,
+          timestamp: new Date()
+      };
+      setExpertMessages(prev => [...prev, userMsg]);
+      setIsExpertTyping(true);
+
+      const apiHistory = expertMessages.map(m => ({
+          role: m.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: m.text }]
+      }));
+
+      const response = await chatWithExpert(era, apiHistory, text);
+
+      const botMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          sender: 'npc',
+          text: response,
+          timestamp: new Date()
+      };
+      setExpertMessages(prev => [...prev, botMsg]);
+      setIsExpertTyping(false);
   };
 
   const handlePlayEvent = async (event: HistoricalEvent) => {
@@ -273,15 +313,11 @@ export default function App() {
 
   const handleSelectMapLocation = async (location: MapLocation) => {
       setActiveMapLocation(location);
-      
-      // Check cache first
       if (gameState.locationVisuals[location.id]) {
           return;
       }
-
       setIsLoadingSpatial(true);
       const visualUrl = await generateMapVisual(era, location.visualPrompt);
-      
       setGameState(prev => ({
           ...prev,
           locationVisuals: {
@@ -374,7 +410,7 @@ export default function App() {
             </div>
         )}
 
-        {/* Map Interface - Placed below navigation/HUD per request */}
+        {/* Map Interface */}
         <section>
              <MapInterface 
                 locations={gameState.mapLocations}
@@ -402,14 +438,13 @@ export default function App() {
         {/* Interaction Grid */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[600px]">
           
-          {/* Controls & Events - Takes 1 column */}
+          {/* Controls & Events */}
           <div className="lg:col-span-1 flex flex-col gap-6 h-full overflow-y-auto pr-2">
-            
             <HistoricalEvents 
                 events={gameState.historicalEvents}
                 onPlayEvent={handlePlayEvent}
                 isGenerating={gameState.isGeneratingVideo}
-                currentVideoId={gameState.currentVideoEventId}
+                currentVideoEventId={gameState.currentVideoEventId}
                 disabled={gameState.isLoadingText || isInitializing}
             />
 
@@ -425,19 +460,20 @@ export default function App() {
             </div>
           </div>
 
-          {/* Chat - Takes 2 columns */}
+          {/* Chat & Perspectives */}
           <div className="lg:col-span-2 flex flex-col gap-6 h-full">
             <div className="flex-1 min-h-[400px]">
                 <ChatInterface 
-                    messages={messages}
+                    messages={chatMode === 'npc' ? messages : expertMessages}
                     onSendMessage={handleSendMessage}
-                    npcName={gameState.npcName}
-                    npcRole={gameState.npcRole}
-                    isTyping={isTyping}
+                    npcName={chatMode === 'npc' ? gameState.npcName : "Dr. Chronos"}
+                    npcRole={chatMode === 'npc' ? gameState.npcRole : "Historical Archivist"}
+                    isTyping={chatMode === 'npc' ? isTyping : isExpertTyping}
+                    activeTab={chatMode}
+                    onTabChange={setChatMode}
                 />
             </div>
             
-            {/* Perspectives Component placed below Chat */}
             <div className="flex-shrink-0">
                 <Perspectives perspectives={gameState.perspectives} />
             </div>
