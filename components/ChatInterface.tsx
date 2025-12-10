@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, MessageSquare, Mic, BookOpen } from 'lucide-react';
 import { Message } from '../types';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -103,7 +104,39 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   : 'bg-gray-800 text-gray-200 rounded-bl-none border border-gray-700'
               }`}
             >
-              {msg.text}
+              <ReactMarkdown 
+                components={{
+                    p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                    a: ({node, ...props}) => <a className="underline hover:text-white/80" target="_blank" rel="noopener noreferrer" {...props} />,
+                    strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+                    li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                    blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-white/30 pl-3 italic my-2" {...props} />,
+                    code: ({node, className, children, ...props}: any) => {
+                        const match = /language-(\w+)/.exec(className || '')
+                        const isInline = !match && !String(children).includes('\n');
+                        return isInline ? (
+                            <code className="bg-black/20 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                                {children}
+                            </code>
+                        ) : (
+                            <div className="my-2 bg-black/30 rounded-lg overflow-hidden border border-white/10">
+                                {match?.[1] && (
+                                    <div className="bg-black/20 px-3 py-1 text-[10px] uppercase opacity-70 font-mono border-b border-white/5">
+                                        {match[1]}
+                                    </div>
+                                )}
+                                <code className="block p-3 text-xs font-mono overflow-x-auto" {...props}>
+                                    {children}
+                                </code>
+                            </div>
+                        )
+                    }
+                }}
+              >
+                {msg.text}
+              </ReactMarkdown>
             </div>
           </div>
         ))}
