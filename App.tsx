@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Era, GameState, Message, NavigationAction, HistoricalEvent, MapLocation } from './types';
+import { Era, GameState, Message, NavigationAction, HistoricalEvent, MapLocation, LocalNPC } from './types';
 import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, chatWithExpert, generateHistoricalVideo, generateMapVisual } from './services/geminiService';
 import { SceneView } from './components/SceneView';
 import { ChatInterface } from './components/ChatInterface';
@@ -10,6 +10,7 @@ import { HistoricalEvents } from './components/HistoricalEvents';
 import { MapInterface } from './components/MapInterface';
 import { SpatialViewer } from './components/SpatialViewer';
 import { Perspectives } from './components/Perspectives';
+import { NearbyCharacters } from './components/NearbyCharacters';
 import { History, Loader2, X } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
@@ -20,6 +21,7 @@ const INITIAL_STATE: GameState = {
   isLoadingText: false,
   npcName: "...",
   npcRole: "...",
+  nearbyNPCs: [],
   atmosphere: { weather: "Clear", sound: "Silence", smell: "Dust", lighting: "Bright" },
   confidence: { proven: [], likely: [], speculative: [] },
   simulation: { 
@@ -37,6 +39,7 @@ const INITIAL_STATE: GameState = {
   perspectives: [],
   isGeneratingVideo: false,
   currentVideoEventId: null,
+  currentVideoNPCId: null,
   viewingLocationId: null,
   locationVisuals: {}
 };
@@ -79,7 +82,8 @@ export default function App() {
         simulation: simState,
         mapLocations: mapLocations,
         perspectives: perspectives,
-        historicalEvents: [] 
+        historicalEvents: [],
+        nearbyNPCs: []
     }));
 
     const navResult = await navigateScene(
@@ -90,13 +94,16 @@ export default function App() {
         simState
     );
 
+    const firstNPC = navResult.nearbyCharacters?.[0] || { name: 'Unknown', role: 'Unknown', id: 'unknown', activity: '', videoPrompt: '' };
+
     // 3. Update State
     setGameState(prev => ({
         ...prev,
         currentLocation: navResult.newLocation,
         currentDescription: navResult.description,
-        npcName: navResult.npcSuggestion.name,
-        npcRole: navResult.npcSuggestion.role,
+        npcName: firstNPC.name,
+        npcRole: firstNPC.role,
+        nearbyNPCs: navResult.nearbyCharacters || [],
         atmosphere: navResult.atmosphere,
         confidence: navResult.confidence,
         simulation: { ...prev.simulation, ...navResult.simulationUpdate },
@@ -138,12 +145,35 @@ export default function App() {
       gameState.simulation
     );
 
+    // If active NPC is no longer in the new list, pick the first new one
+    let nextNpcName = gameState.npcName;
+    let nextNpcRole = gameState.npcRole;
+    
+    if (navResult.nearbyCharacters && navResult.nearbyCharacters.length > 0) {
+        const stillHere = navResult.nearbyCharacters.find((c: any) => c.name === gameState.npcName);
+        if (!stillHere) {
+            nextNpcName = navResult.nearbyCharacters[0].name;
+            nextNpcRole = navResult.nearbyCharacters[0].role;
+            // Add a message about meeting new people
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: Date.now().toString(),
+                    sender: 'npc',
+                    text: `*You approach ${navResult.nearbyCharacters[0].name}...*`,
+                    timestamp: new Date()
+                }
+            ]);
+        }
+    }
+
     setGameState(prev => ({
       ...prev,
       currentLocation: navResult.newLocation,
       currentDescription: navResult.description,
-      npcName: navResult.npcSuggestion.name,
-      npcRole: navResult.npcSuggestion.role,
+      npcName: nextNpcName,
+      npcRole: nextNpcRole,
+      nearbyNPCs: navResult.nearbyCharacters || [],
       atmosphere: navResult.atmosphere,
       confidence: navResult.confidence,
       simulation: { 
@@ -164,18 +194,6 @@ export default function App() {
                 id: Date.now().toString(),
                 sender: 'npc', 
                 text: `[SYSTEM] ${navResult.simulationUpdate.actionResultText}`,
-                timestamp: new Date()
-            }
-        ]);
-    }
-
-    if (gameState.npcName !== navResult.npcSuggestion.name) {
-         setMessages(prev => [
-            ...prev,
-            {
-                id: (Date.now() + 1).toString(),
-                sender: 'npc',
-                text: `*You see ${navResult.npcSuggestion.name} (${navResult.npcSuggestion.role}) nearby.*`,
                 timestamp: new Date()
             }
         ]);
@@ -308,6 +326,37 @@ export default function App() {
                 timestamp: new Date()
             }
         ]);
+    }
+  };
+
+  const handleGenerateNPCVideo = async (npc: LocalNPC) => {
+    if (npc.videoUri) {
+        setActiveVideoUri(npc.videoUri);
+        return;
+    }
+
+    setGameState(prev => ({
+        ...prev,
+        isGeneratingVideo: true,
+        currentVideoNPCId: npc.id
+    }));
+
+    const videoUri = await generateHistoricalVideo(npc.videoPrompt);
+
+    setGameState(prev => {
+        const updatedNPCs = prev.nearbyNPCs.map(n => 
+            n.id === npc.id ? { ...n, videoUri: videoUri || undefined } : n
+        );
+        return {
+            ...prev,
+            nearbyNPCs: updatedNPCs,
+            isGeneratingVideo: false,
+            currentVideoNPCId: null
+        };
+    });
+
+    if (videoUri) {
+        setActiveVideoUri(videoUri);
     }
   };
 
@@ -444,7 +493,7 @@ export default function App() {
                 events={gameState.historicalEvents}
                 onPlayEvent={handlePlayEvent}
                 isGenerating={gameState.isGeneratingVideo}
-                currentVideoEventId={gameState.currentVideoEventId}
+                currentVideoId={gameState.currentVideoEventId}
                 disabled={gameState.isLoadingText || isInitializing}
             />
 
@@ -453,11 +502,19 @@ export default function App() {
               disabled={gameState.isLoadingText || isInitializing} 
             />
             
-            <div className="p-6 rounded-xl border border-gray-800 bg-gray-900/50">
-               <h4 className="text-amber-500 text-xs font-bold uppercase tracking-widest mb-2">Nearby</h4>
-               <p className="text-xl font-bold text-white historical-font mb-1">{gameState.npcName}</p>
-               <p className="text-sm text-gray-400 italic">{gameState.npcRole}</p>
-            </div>
+            {/* New Nearby Characters Component replacing simple box */}
+            <NearbyCharacters 
+                npcs={gameState.nearbyNPCs}
+                activeNpcName={gameState.npcName}
+                onSelectNpc={(npc) => {
+                    setGameState(prev => ({ ...prev, npcName: npc.name, npcRole: npc.role }));
+                    if (chatMode === 'expert') setChatMode('npc');
+                }}
+                onGenerateVideo={handleGenerateNPCVideo}
+                onPlayVideo={setActiveVideoUri}
+                isGeneratingId={gameState.currentVideoNPCId}
+                disabled={gameState.isLoadingText || isInitializing}
+            />
           </div>
 
           {/* Chat & Perspectives */}

@@ -65,14 +65,24 @@ export interface Perspective {
   content: string; // Their quote/viewpoint
 }
 
+export interface LocalNPC {
+  id: string;
+  name: string;
+  role: string;
+  activity: string;
+  videoPrompt: string;
+  videoUri?: string;
+}
+
 export interface GameState {
   currentLocation: string;
   currentDescription: string;
   imageUrl: string | null;
   isLoadingImage: boolean;
   isLoadingText: boolean;
-  npcName: string;
-  npcRole: string;
+  npcName: string; // Currently active chat NPC
+  npcRole: string; // Currently active chat NPC role
+  nearbyNPCs: LocalNPC[]; // List of all nearby characters
   atmosphere: Atmosphere;
   confidence: ConfidenceData;
   simulation: SimulationState;
@@ -82,6 +92,7 @@ export interface GameState {
   perspectives: Perspective[];
   isGeneratingVideo: boolean;
   currentVideoEventId: string | null;
+  currentVideoNPCId: string | null; // Track which NPC video is generating
   viewingLocationId: string | null;
   locationVisuals: Record<string, string>; // Cache for map visual URLs
 }

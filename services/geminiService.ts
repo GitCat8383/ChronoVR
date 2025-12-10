@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Era, SimulationState, HistoricalEvent, MapLocation, Perspective } from '../types';
+import { Era, SimulationState, HistoricalEvent, MapLocation, Perspective, LocalNPC } from '../types';
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -149,7 +149,8 @@ export const navigateScene = async (
     2. Atmosphere: Describe sounds, smells, weather, lighting.
     3. Archeology: Categorize visible elements by historical certainty (Proven, Likely, Speculative).
     4. Simulation: Update time, health, gold based on the action.
-    5. History: Identify 1-2 SPECIFIC historical events that happened near here or are relevant to this location/era.
+    5. History: Identify 1-2 SPECIFIC historical events that happened near here.
+    6. People: Identify 3-4 locals (mixture of classes/roles) currently present in this location.
   `;
 
   const responseSchema: Schema = {
@@ -176,13 +177,18 @@ export const navigateScene = async (
         },
         required: ["proven", "likely", "speculative"]
       },
-      npcSuggestion: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          role: { type: Type.STRING }
-        },
-        required: ["name", "role"]
+      nearbyCharacters: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            role: { type: Type.STRING },
+            activity: { type: Type.STRING, description: "What they are currently doing" },
+            videoPrompt: { type: Type.STRING, description: "A detailed prompt to generate a cinematic, photorealistic video of this person performing their daily activity." }
+          },
+          required: ["name", "role", "activity", "videoPrompt"]
+        }
       },
       simulationUpdate: {
         type: Type.OBJECT,
@@ -209,7 +215,7 @@ export const navigateScene = async (
         }
       }
     },
-    required: ["newLocation", "description", "atmosphere", "confidence", "npcSuggestion", "simulationUpdate", "historicalEvents"]
+    required: ["newLocation", "description", "atmosphere", "confidence", "nearbyCharacters", "simulationUpdate", "historicalEvents"]
   };
 
   const prompt = `
@@ -221,12 +227,18 @@ export const navigateScene = async (
 
   try {
     const result = await getJson(prompt, systemInstruction, responseSchema);
-    // Add IDs to events
+    // Add IDs to events and characters
     if (result.historicalEvents) {
       result.historicalEvents = result.historicalEvents.map((e: any, i: number) => ({
         ...e,
         id: `event-${Date.now()}-${i}`
       }));
+    }
+    if (result.nearbyCharacters) {
+        result.nearbyCharacters = result.nearbyCharacters.map((c: any, i: number) => ({
+            ...c,
+            id: `npc-${Date.now()}-${i}`
+        }));
     }
     return result;
   } catch (error) {
@@ -237,7 +249,7 @@ export const navigateScene = async (
       description: "The simulation wavers. You remain where you are.",
       atmosphere: { weather: "Hazy", sound: "Static", smell: "Ozone", lighting: "Dim" },
       confidence: { proven: [], likely: [], speculative: ["Everything"] },
-      npcSuggestion: { name: "Ghost", role: "Unknown" },
+      nearbyCharacters: [{ id: 'ghost', name: 'Ghost', role: 'Spirit', activity: 'Fading', videoPrompt: 'Ghost' }],
       simulationUpdate: { goldChange: 0, healthChange: 0, timeOfDay: simState.timeOfDay, actionResultText: "Nothing happened." },
       historicalEvents: []
     };
@@ -284,8 +296,6 @@ export const generateHistoricalVideo = async (prompt: string): Promise<string | 
       const hasKey = await window.aistudio.hasSelectedApiKey();
       if (!hasKey) {
           await window.aistudio.openSelectKey();
-          // Assuming user selected key, re-instantiate AI with env key is handled by framework usually, 
-          // but here we just proceed. The library uses process.env.API_KEY.
       }
   }
 
