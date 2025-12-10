@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Era, GameState, Message, NavigationAction, HistoricalEvent, MapLocation, LocalNPC } from './types';
-import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, chatWithExpert, generateHistoricalVideo, generateMapVisual, generateStrategicMapImage } from './services/geminiService';
+import { startSimulation, navigateScene, generateSceneImage, chatWithNPC, chatWithExpert, generateHistoricalVideo, generateMapVisual, generateStrategicMapImage, generateCustomEvent } from './services/geminiService';
 import { SceneView } from './components/SceneView';
 import { ChatInterface } from './components/ChatInterface';
 import { Controls } from './components/Controls';
@@ -42,11 +42,11 @@ const INITIAL_STATE: GameState = {
   currentVideoEventId: null,
   currentVideoNPCId: null,
   viewingLocationId: null,
-  locationVisuals: {}
-};
+  locationVisuals: {} // Cache for map visual URLs
+}
 
 export default function App() {
-  const [era, setEra] = useState<Era>(Era.ANCIENT_ROME);
+  const [era, setEra] = useState<string>(Era.ANCIENT_ROME);
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
   
   // NPC Chat State
@@ -62,9 +62,10 @@ export default function App() {
   const [activeVideoUri, setActiveVideoUri] = useState<string | null>(null);
   const [activeMapLocation, setActiveMapLocation] = useState<MapLocation | null>(null);
   const [isLoadingSpatial, setIsLoadingSpatial] = useState(false);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
 
   // Initialize Game Logic
-  const initializeEra = async (selectedEra: Era) => {
+  const initializeEra = async (selectedEra: string) => {
     setIsInitializing(true);
     setMessages([]);
     setExpertMessages([]);
@@ -126,7 +127,7 @@ export default function App() {
     initializeEra(era);
   }, [era]);
 
-  const updateSceneImage = async (era: Era, description: string, atmosphere: any) => {
+  const updateSceneImage = async (era: string, description: string, atmosphere: any) => {
     setGameState(prev => ({ ...prev, isLoadingImage: true }));
     const url = await generateSceneImage(era, description, atmosphere);
     setGameState(prev => ({ 
@@ -280,6 +281,28 @@ export default function App() {
       };
       setExpertMessages(prev => [...prev, botMsg]);
       setIsExpertTyping(false);
+  };
+
+  const handleCreateEvent = async (query: string) => {
+      setIsCreatingEvent(true);
+      const newEvent = await generateCustomEvent(era, query);
+      if (newEvent) {
+          setGameState(prev => ({
+              ...prev,
+              historicalEvents: [newEvent, ...prev.historicalEvents]
+          }));
+          // Optional: Notify user via chat
+          setMessages(prev => [
+            ...prev,
+            {
+                id: Date.now().toString(),
+                sender: 'npc',
+                text: `[SYSTEM] Found record for "${newEvent.title}". You can now play the visualization.`,
+                timestamp: new Date()
+            }
+        ]);
+      }
+      setIsCreatingEvent(false);
   };
 
   const handlePlayEvent = async (event: HistoricalEvent) => {
@@ -502,6 +525,8 @@ export default function App() {
                 isGenerating={gameState.isGeneratingVideo}
                 currentVideoId={gameState.currentVideoEventId}
                 disabled={gameState.isLoadingText || isInitializing}
+                onCreateEvent={handleCreateEvent}
+                isCreating={isCreatingEvent}
             />
 
             <Controls 

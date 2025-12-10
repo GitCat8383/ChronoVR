@@ -28,7 +28,7 @@ const getJson = async (prompt: string, systemInstruction: string, schema: Schema
 };
 
 // 1. Initialize "Day in the Life" + Map + Perspectives
-export const startSimulation = async (era: Era): Promise<{ simState: SimulationState, mapLocations: MapLocation[], perspectives: Perspective[] }> => {
+export const startSimulation = async (era: string): Promise<{ simState: SimulationState, mapLocations: MapLocation[], perspectives: Perspective[] }> => {
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
@@ -133,7 +133,7 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
 
 // 2. Scene Navigation & Simulation Loop
 export const navigateScene = async (
-  era: Era,
+  era: string,
   currentLocation: string,
   lastDescription: string,
   action: string,
@@ -258,7 +258,7 @@ export const navigateScene = async (
 };
 
 // 3. Image Generation
-export const generateSceneImage = async (era: Era, description: string, atmosphere: any): Promise<string | null> => {
+export const generateSceneImage = async (era: string, description: string, atmosphere: any): Promise<string | null> => {
   const model = "gemini-2.5-flash-image";
   const prompt = `
     First-person view, photorealistic, cinematic lighting, 8k resolution.
@@ -337,7 +337,7 @@ export const generateHistoricalVideo = async (prompt: string): Promise<string | 
 
 // 5. NPC Chat (Role Aware)
 export const chatWithNPC = async (
-  era: Era,
+  era: string,
   npcName: string,
   npcRole: string,
   history: { role: string; parts: { text: string }[] }[],
@@ -380,7 +380,7 @@ export const chatWithNPC = async (
 
 // 6. Expert Chat (Factual)
 export const chatWithExpert = async (
-  era: Era,
+  era: string,
   history: { role: string; parts: { text: string }[] }[],
   userMessage: string
 ): Promise<string> => {
@@ -417,7 +417,7 @@ export const chatWithExpert = async (
 };
 
 // 7. Generate Map Visual (Panoramic)
-export const generateMapVisual = async (era: Era, prompt: string): Promise<string | null> => {
+export const generateMapVisual = async (era: string, prompt: string): Promise<string | null> => {
     const model = "gemini-2.5-flash-image";
     const fullPrompt = `
       Wide angle panoramic shot, 16:9 aspect ratio.
@@ -450,7 +450,7 @@ export const generateMapVisual = async (era: Era, prompt: string): Promise<strin
   };
 
 // 8. Generate Strategic Map (Top-down)
-export const generateStrategicMapImage = async (era: Era): Promise<string | null> => {
+export const generateStrategicMapImage = async (era: string): Promise<string | null> => {
     const model = "gemini-2.5-flash-image";
     const prompt = `
       Top down historical map of ${era}. 
@@ -478,6 +478,44 @@ export const generateStrategicMapImage = async (era: Era): Promise<string | null
       return null;
     } catch (error) {
       console.error("Strategic Map Gen Error:", error);
+      return null;
+    }
+  };
+
+// 9. Generate Custom Historical Event
+export const generateCustomEvent = async (era: string, query: string): Promise<HistoricalEvent | null> => {
+    const schema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        date: { type: Type.STRING },
+        description: { type: Type.STRING },
+        impact: { type: Type.STRING },
+        videoPrompt: { type: Type.STRING, description: "Detailed visual prompt for generating a short video of this event. Photorealistic, cinematic." }
+      },
+      required: ["title", "date", "description", "impact", "videoPrompt"]
+    };
+  
+    const system = `
+      You are an expert historian. 
+      Create a historical event entry for the user's query: "${query}" in the context of ${era}.
+      If the user's query is vague, infer the most likely historical event they mean.
+      If it is not relevant to the era, explain the discrepancy in the description but provide the closest match or the event itself if it is famous.
+    `;
+    const prompt = `Generate event details for: ${query}`;
+  
+    try {
+      const data = await getJson(prompt, system, schema);
+      return {
+          id: `custom-event-${Date.now()}`,
+          title: data.title,
+          date: data.date,
+          description: data.description,
+          impact: data.impact,
+          videoPrompt: data.videoPrompt
+      };
+    } catch (e) {
+      console.error("Custom Event Gen Error", e);
       return null;
     }
   };
