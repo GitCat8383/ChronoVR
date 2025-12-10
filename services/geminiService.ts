@@ -75,6 +75,7 @@ export const startSimulation = async (era: Era): Promise<{ simState: SimulationS
     1. Assign the user a humble role.
     2. Generate 4-5 KEY locations for a city map. 
        - If Vietnam War: Must include 'Hue Citadel' (Tet Offensive context) and 'Independence Palace' (Fall of Saigon context) if relevant to the specific year provided in Era.
+       - If New York City (September 11, 2001): Must include 'World Trade Center Plaza' (Morning context) and 'Battery Park'. Ensure the tone is respectful and historically accurate.
        - Locations should allow for "Street View" style visualization of historical events.
     3. Generate 3-4 diverse perspectives on this era:
        - 1 Key Historical Figure (e.g., Caesar, Ho Chi Minh).
