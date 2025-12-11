@@ -11,7 +11,9 @@ import { MapInterface } from './components/MapInterface';
 import { SpatialViewer } from './components/SpatialViewer';
 import { Perspectives } from './components/Perspectives';
 import { NearbyCharacters } from './components/NearbyCharacters';
-import { History, Loader2, X } from 'lucide-react';
+import { GodMode } from './components/GodMode';
+import { ButterflyEffect } from './components/ButterflyEffect';
+import { History, Loader2, X, GitBranch } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
   currentLocation: "City Gates",
@@ -42,7 +44,8 @@ const INITIAL_STATE: GameState = {
   currentVideoEventId: null,
   currentVideoNPCId: null,
   viewingLocationId: null,
-  locationVisuals: {} // Cache for map visual URLs
+  locationVisuals: {}, // Cache for map visual URLs
+  alternateReality: { active: false, divergencePoint: '', consequences: '' }
 }
 
 export default function App() {
@@ -64,6 +67,10 @@ export default function App() {
   const [isLoadingSpatial, setIsLoadingSpatial] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
 
+  // New Feature States
+  const [showGodMode, setShowGodMode] = useState(false);
+  const [showButterflyMode, setShowButterflyMode] = useState(false);
+
   // Initialize Game Logic
   const initializeEra = async (selectedEra: string) => {
     setIsInitializing(true);
@@ -72,7 +79,12 @@ export default function App() {
     setChatMode('npc');
     setActiveVideoUri(null);
     setActiveMapLocation(null);
-    setGameState(prev => ({ ...prev, locationVisuals: {}, mapBackgroundUrl: null })); 
+    setGameState(prev => ({ 
+        ...prev, 
+        locationVisuals: {}, 
+        mapBackgroundUrl: null,
+        alternateReality: { active: false, divergencePoint: '', consequences: '' }
+    })); 
     
     // 0. Trigger Map Background Generation in background
     generateStrategicMapImage(selectedEra).then(url => {
@@ -406,6 +418,34 @@ export default function App() {
       setIsLoadingSpatial(false);
   };
 
+  const handleApplyDivergence = async (result: any) => {
+    // 1. Update Game State Description/Atmosphere
+    setGameState(prev => ({
+        ...prev,
+        currentDescription: result.description,
+        atmosphere: result.atmosphere,
+        alternateReality: {
+            active: true,
+            divergencePoint: "Timestream Altered",
+            consequences: result.consequences
+        }
+    }));
+
+    // 2. Add System Message
+    setMessages(prev => [
+        ...prev,
+        {
+            id: Date.now().toString(),
+            sender: 'npc',
+            text: `[ALERT] TIMELINE DIVERGENCE DETECTED. CONSEQUENCES: ${result.consequences}`,
+            timestamp: new Date()
+        }
+    ]);
+
+    // 3. Update Visuals
+    updateSceneImage(era, result.description, result.atmosphere);
+  };
+
   const triggerNPCExplanation = (title: string, desc: string) => {
      setTimeout(() => {
          setMessages(prev => [
@@ -441,6 +481,11 @@ export default function App() {
                     <Loader2 className="w-4 h-4 animate-spin" /> Preparing Simulation...
                 </div>
             )}
+            {gameState.alternateReality?.active && (
+                <div className="bg-purple-900/40 border border-purple-500/50 px-3 py-1 rounded text-xs text-purple-200 font-bold uppercase tracking-wider flex items-center gap-2 animate-pulse">
+                    <GitBranch className="w-4 h-4" /> Alternate Timeline Active
+                </div>
+            )}
           </div>
           
           <LocationMenu 
@@ -464,9 +509,28 @@ export default function App() {
             onClose={() => setActiveMapLocation(null)}
         />
 
+        {/* God Mode Modal */}
+        {showGodMode && (
+            <GodMode 
+                era={era} 
+                onClose={() => setShowGodMode(false)} 
+                onPlayVideo={setActiveVideoUri}
+            />
+        )}
+
+        {/* Butterfly Effect Modal */}
+        {showButterflyMode && (
+            <ButterflyEffect 
+                era={era}
+                currentDescription={gameState.currentDescription}
+                onClose={() => setShowButterflyMode(false)}
+                onApplyDivergence={handleApplyDivergence}
+            />
+        )}
+
         {/* Video Overlay Modal */}
         {activeVideoUri && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in">
                 <div className="relative w-full max-w-4xl bg-black rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
                     <button 
                         onClick={() => setActiveVideoUri(null)}
@@ -482,7 +546,7 @@ export default function App() {
                     />
                     <div className="p-4 bg-gray-900">
                         <p className="text-amber-500 text-xs font-bold uppercase tracking-widest mb-1">Historical Archives</p>
-                        <p className="text-white text-sm">Now playing reconstruction footage...</p>
+                        <p className="text-white text-sm">Now playing visual reconstruction...</p>
                     </div>
                 </div>
             </div>
@@ -531,10 +595,11 @@ export default function App() {
 
             <Controls 
               onNavigate={handleNavigation} 
+              onOpenGodMode={() => setShowGodMode(true)}
+              onOpenButterflyMode={() => setShowButterflyMode(true)}
               disabled={gameState.isLoadingText || isInitializing} 
             />
             
-            {/* New Nearby Characters Component replacing simple box */}
             <NearbyCharacters 
                 npcs={gameState.nearbyNPCs}
                 activeNpcName={gameState.npcName}

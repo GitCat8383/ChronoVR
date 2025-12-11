@@ -518,3 +518,58 @@ export const generateCustomEvent = async (era: string, query: string): Promise<H
       return null;
     }
   };
+
+// 10. Generate Time-Lapse Video (God Mode)
+export const generateTimeLapse = async (era: string, subject: string): Promise<string | null> => {
+    const prompt = `
+      Bird's eye view time-lapse of ${subject} in the era of ${era}. 
+      Show the process of construction, evolution, or movement over time.
+      Fast motion, wide angle, photorealistic, cinematic.
+      From empty ground to finished state or massive crowd movement.
+    `;
+    return generateHistoricalVideo(prompt);
+};
+
+// 11. Diverge History (Butterfly Effect)
+export const divergeHistory = async (era: string, intervention: string, currentContext: string): Promise<any> => {
+    const system = `
+        You are an Alternate History Engine.
+        The user has intervened in history: "${intervention}" during ${era}.
+        Calculate the immediate butterfly effect.
+        
+        Outputs:
+        1. Description: Vivid description of the immediate changes in the scene.
+        2. Atmosphere: How the mood/lighting changes (e.g., chaotic, darker, hopeful).
+        3. Consequences: A summary of the long-term political/social impact.
+        4. NPCs: New characters that might appear due to this change.
+    `;
+    
+    const schema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+            description: { type: Type.STRING },
+            atmosphere: {
+                type: Type.OBJECT,
+                properties: {
+                  weather: { type: Type.STRING },
+                  sound: { type: Type.STRING },
+                  smell: { type: Type.STRING },
+                  lighting: { type: Type.STRING }
+                },
+                required: ["weather", "sound", "smell", "lighting"]
+            },
+            consequences: { type: Type.STRING },
+            visualPrompt: { type: Type.STRING, description: "Prompt for the new scene image reflecting these changes." }
+        },
+        required: ["description", "atmosphere", "consequences", "visualPrompt"]
+    };
+
+    const prompt = `Context: ${currentContext}. Intervention: ${intervention}.`;
+
+    try {
+        return await getJson(prompt, system, schema);
+    } catch (e) {
+        console.error("Divergence Error", e);
+        return null;
+    }
+};

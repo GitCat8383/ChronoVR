@@ -96,6 +96,11 @@ export interface GameState {
   currentVideoNPCId: string | null; // Track which NPC video is generating
   viewingLocationId: string | null;
   locationVisuals: Record<string, string>; // Cache for map visual URLs
+  alternateReality?: {
+      active: boolean;
+      divergencePoint: string;
+      consequences: string;
+  };
 }
 
 export interface NavigationAction {
