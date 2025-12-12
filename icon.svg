@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0f0f10" rx="100" />
+  <!-- Column Base -->
+  <path fill="#e2e8f0" d="M156,400 h200 v40 h-200 z" />
+  <path fill="#94a3b8" d="M176,360 h160 v40 h-160 z" />
+  <!-- Column Shaft - intact left side -->
+  <rect x="196" y="140" width="40" height="220" fill="#e2e8f0" />
+  <rect x="236" y="140" width="40" height="220" fill="#cbd5e1" />
+  <!-- Column Shaft - dissolving right side (Pixels) -->
+  <rect x="280" y="140" width="25" height="25" fill="url(#grad)" opacity="0.9" />
+  <rect x="310" y="155" width="20" height="20" fill="url(#grad)" opacity="0.8" />
+  <rect x="285" y="180" width="22" height="22" fill="url(#grad)" opacity="0.85" />
+  <rect x="315" y="200" width="18" height="18" fill="url(#grad)" opacity="0.6" />
+  <rect x="280" y="220" width="25" height="25" fill="url(#grad)" opacity="0.9" />
+  <rect x="320" y="240" width="15" height="15" fill="url(#grad)" opacity="0.5" />
+  <rect x="290" y="260" width="22" height="22" fill="url(#grad)" opacity="0.8" />
+  <rect x="330" y="280" width="12" height="12" fill="url(#grad)" opacity="0.4" />
+  <rect x="280" y="300" width="25" height="25" fill="url(#grad)" opacity="0.9" />
+  <rect x="310" y="320" width="20" height="20" fill="url(#grad)" opacity="0.7" />
+  <!-- Capital -->
+  <path fill="#94a3b8" d="M176,100 h160 v40 h-160 z" />
+  <path fill="#e2e8f0" d="M156,70 h200 v30 h-200 z" />
+  <!-- Floating Pixels -->
+  <rect x="350" y="130" width="10" height="10" fill="#f59e0b" opacity="0.6" />
+  <rect x="360" y="180" width="8" height="8" fill="#7c3aed" opacity="0.5" />
+  <rect x="340" y="250" width="12" height="12" fill="#f59e0b" opacity="0.4" />
+</svg>
